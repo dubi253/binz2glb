@@ -1,0 +1,17 @@
+# Docker 构建上下文瘦身：只需要页面、模型 glb、标注
+.git/
+.gitignore
+node_modules/
+.venv/
+out/
+tmp/
+web-save/
+data/
+page-snapshots/
+
+# 加密源文件（几十 MB，镜像里用不到）
+models/*/source/
+
+# 文档不进镜像
+*.md
+skills/

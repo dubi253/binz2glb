@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SEMulator3D FinFET — 带标注的离线浏览</title>
+<link rel="stylesheet" href="style.css">
+<script type="module" src="lib/model-viewer.min.js"></script>
+</head>
+<body>
+<header>
+  <strong>SEMulator3D FinFET Process Model</strong>
+  <span class="sub">coventor · 1,252,798 三角面 · 17 种材料</span>
+  <nav>
+    <button id="reset">复位视角</button>
+    <button id="toggle-ann" class="on">标注：开</button>
+  </nav>
+</header>
+
+<model-viewer id="mv"
+  src="models/finfet/finfet.glb"
+  alt="SEMulator3D FinFET 工艺模型"
+  camera-controls
+  touch-action="pan-y"
+  interaction-prompt="none"
+  shadow-intensity="0.6"
+  exposure="1.0"
+  environment-image="neutral"
+  tone-mapping="neutral">
+</model-viewer>
+
+<aside id="card" hidden>
+  <button id="card-close" aria-label="关闭">×</button>
+  <img id="card-img" alt="">
+  <h2 id="card-title"></h2>
+  <p id="card-text"></p>
+  <p class="hint" id="card-index"></p>
+</aside>
+
+<div id="legend">
+  <span>点击模型上的圆点查看各层材料说明</span>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

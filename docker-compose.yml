@@ -1,0 +1,11 @@
+services:
+  viewer:
+    build:
+      context: .
+      dockerfile: viewer/Dockerfile
+    image: finfet-viewer:1
+    container_name: finfet-viewer
+    ports:
+      - "8123:80"
+    # 需要开机自启再打开这一行（默认不加常驻策略）
+    # restart: unless-stopped

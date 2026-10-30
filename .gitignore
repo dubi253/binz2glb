@@ -1,0 +1,21 @@
+# 依赖与虚拟环境
+node_modules/
+.venv/
+venv/
+
+# 中间产物（raw/norm/final 各一份，几百 MB，跑完就删）
+out/
+tmp/
+
+# models/ 整个目录不入库（含 glb、binz 源文件、标注、meta）
+# 需要某个模型入库时用 git add -f（或先 git lfs track）
+models/
+
+# 网页快照（含第三方 viewer 的闭源 bundle，仅本地保存用于解密）
+web-save/
+data/
+page-snapshots/
+
+# 编辑器/系统垃圾
+*.swp
+.DS_Store
