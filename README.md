@@ -30,9 +30,10 @@ UV_DEFAULT_INDEX=https://pypi.tuna.tsinghua.edu.cn/simple \
   uv pip install --python .venv/bin/python numpy
 npm install --registry=https://registry.npmmirror.com gltf-validator
 
-# 看模型（需要 models/<slug>/finfet.glb，见"从 binz 重新生成"）
-docker compose up -d --build
+# 看模型：直接用 CI 构建好的镜像（本地不构建），模型目录挂载进去
+docker compose pull && docker compose up -d
 #   http://127.0.0.1:8123/        带标注的主视图
+# 前提：models/<slug>/finfet.glb 在本地，见"从 binz 重新生成"
 ```
 
 ## 内网部署（镜像已经在内网机器上）
@@ -73,17 +74,19 @@ docker pull nginx:alpine
 ### 1. 搬运镜像
 
 ```bash
-# 构建机
-docker build -f viewer/Dockerfile -t finfet-viewer:1 .
-docker save finfet-viewer:1 | gzip -9 > finfet-viewer-1.tar.gz     # 约 70 MB（模型占大头）
+# 构建机 / 有网的机器：拉 CI 产物
+docker pull ghcr.io/dubi253/binz2glb:latest
+docker save ghcr.io/dubi253/binz2glb:latest | gzip -9 > viewer.tar.gz   # 约 40 MB
 
 # 内网机
-gunzip -c finfet-viewer-1.tar.gz | docker load
-docker run -d --name finfet-viewer -p 8123:80 finfet-viewer:1
-curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8123/    # 200
+gunzip -c viewer.tar.gz | docker load
+docker run -d --name finfet-viewer -p 8123:80 \
+  -v /srv/models:/usr/share/nginx/html/models:ro \
+  ghcr.io/dubi253/binz2glb:latest
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8123/      # 200
 ```
 
-内网机已有 `nginx:alpine` 时也可以只搬代码、在内网 `docker build`——构建全程命中本地层，不联网。
+镜像由 GitHub Actions 构建（`.github/workflows/image.yml`），本地不需要 `docker build`。
 
 ### 2. 导入模型文件（模型不进 git）
 
@@ -98,12 +101,12 @@ models/<slug>/
 
 三种导入方式，按场景选：
 
-**A. 打进镜像（最稳，适合一次部署）** —— 把 `models/` 拷到内网机仓库根，然后内网构建：
+**A. 内置进镜像（不想挂载时）** —— 模型不在 git 里，所以内置只能二选一：
 
-```bash
-scp -r models/ intranet-host:/opt/finfet-models/          # 或用内网共享盘
-cd /opt/finfet-models && docker build -f viewer/Dockerfile -t finfet-viewer:1 .
-```
+- 手动触发 Actions（`workflow_dispatch`）时填 `model_url`（glb 的可下载地址），CI 会
+  `--build-arg MODEL_URL=` 把它下载进镜像，产出 `sha-<短哈希>` 那个 tag；
+- 或在有网的机器上本地 `docker build -f viewer/Dockerfile --build-arg MODEL_URL=<url> .`
+  （不推荐，等于绕回本地构建）。
 
 `source/*.binz` 被 `.dockerignore` 排除，不会进镜像（省 38 MB）。
 

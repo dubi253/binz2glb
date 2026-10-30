@@ -8,19 +8,15 @@
 A. 轻量路径（仓库自带的静态查看器，nginx 单容器）
 ============================================================
 
-上游镜像（运行时只需要这一个）：
-  nginx:alpine
+镜像由 GitHub Actions 构建并推到本仓库的 GHCR，本地不构建：
+  ghcr.io/dubi253/binz2glb:latest
 
-自建镜像（由 viewer/Dockerfile 构建）：
-  finfet-viewer:1
-
-构建：
-  cd <仓库根>
-  docker build -f viewer/Dockerfile -t finfet-viewer:1 .
+拉取：
+  docker pull ghcr.io/dubi253/binz2glb:latest
 
 搬运到内网：
-  docker save nginx:alpine finfet-viewer:1 | gzip -9 > finfet-viewer.tar.gz
-  gunzip -c finfet-viewer.tar.gz | docker load
+  docker save ghcr.io/dubi253/binz2glb:latest | gzip -9 > viewer.tar.gz
+  gunzip -c viewer.tar.gz | docker load
 
 
 ============================================================
@@ -54,8 +50,8 @@ B. Sculpt 全栈（多模型库 + 3D 标注，4 个容器）
 汇总（一行一个，可直接喂给 docker pull / docker save）
 ============================================================
 
-# 上游，A 路径
-nginx:alpine
+# A 路径（CI 构建产物，直接拉）
+ghcr.io/dubi253/binz2glb:latest
 
 # 上游，B 路径
 postgres:17-alpine
@@ -63,11 +59,11 @@ redis:7-alpine
 caddy:2-alpine
 
 # 仅构建期（构建机才需要）
+nginx:alpine
 node:20-alpine
 node:20-slim
 
-# 本机自建
-finfet-viewer:1
+# 本机自建（Sculpt 栈）
 sculpt-web:latest
 sculpt-api:latest
 

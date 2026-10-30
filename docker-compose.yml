@@ -1,11 +1,12 @@
 services:
   viewer:
-    build:
-      context: .
-      dockerfile: viewer/Dockerfile
-    image: finfet-viewer:1
+    # 直接用 CI 构建好的镜像，本地不再构建
+    image: ghcr.io/dubi253/binz2glb:latest
     container_name: finfet-viewer
     ports:
       - "8123:80"
+    volumes:
+      # 模型不进镜像，运行时挂载；目录约定 <host>/<slug>/finfet.glb
+      - ./models:/usr/share/nginx/html/models:ro
     # 需要开机自启再打开这一行（默认不加常驻策略）
     # restart: unless-stopped

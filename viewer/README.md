@@ -21,13 +21,19 @@
 
 ## 起停
 
+镜像来自 GHCR（CI 构建），本地不构建；模型目录挂载进去：
+
 ```bash
 cd <仓库根>
-docker compose up -d --build      # 首次构建约 10 秒（上下文 ~78 MB）
+docker compose pull               # 拉 ghcr.io/dubi253/binz2glb:latest
+docker compose up -d
 curl --noproxy '*' -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8123/
 docker compose logs -f            # nginx 日志
 docker compose down               # 停掉并删除容器（镜像保留）
 ```
+
+`docker-compose.yml` 里已带 `./models:/usr/share/nginx/html/models:ro`，
+所以本地只要有 `models/<slug>/finfet.glb` 就能看。
 
 内网其他机器访问：把 `docker-compose.yml` 里的 `"8123:80"` 换成 `"0.0.0.0:8123:80"`
 （默认已经绑全地址），然后 `http://<机器IP>:8123/`。
