@@ -1,0 +1,92 @@
+name: image
+
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+    paths-ignore:
+      - "**/*.md"
+      - "IMAGES.txt"
+      - "skills/**"
+  workflow_dispatch:
+    inputs:
+      model_url:
+        description: "可选：构建时下载模型 glb 的 URL（留空 = 镜像不含模型，运行时挂载 models/）"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  build:
+    name: build & push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=branch
+            type=sha,format=short,prefix=sha-
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Build & push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: viewer/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            MODEL_URL=${{ inputs.model_url }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test the pushed image
+        run: |
+          IMG="${{ env.IMAGE }}:${{ steps.meta.outputs.version }}"
+          echo "testing $IMG"
+          docker run -d --name smoke -p 8080:80 "$IMG"
+          for i in $(seq 1 20); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/ || true)
+            [ "$code" = "200" ] && break
+            sleep 2
+          done
+          echo "index: $code"
+          curl -s -o /dev/null -w 'app.js: %{http_code}\n' http://127.0.0.1:8080/app.js
+          curl -s -o /dev/null -w 'model-viewer: %{http_code}\n' http://127.0.0.1:8080/lib/model-viewer.min.js
+          docker rm -f smoke
+          [ "$code" = "200" ]
+
+      - name: Summary
+        run: |
+          {
+            echo "### image pushed"
+            echo ""
+            echo '```'
+            echo "${{ steps.meta.outputs.tags }}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -7,9 +7,11 @@ venv/
 out/
 tmp/
 
-# models/ 整个目录不入库（含 glb、binz 源文件、标注、meta）
+# models/ 目录不入库（含 glb、binz 源文件、标注、meta），只保留一个占位文件，
+# 让 Docker build 的 COPY models/ 在 CI 里也能成立
+models/*
+!models/.gitkeep
 # 需要某个模型入库时用 git add -f（或先 git lfs track）
-models/
 
 # 网页快照（含第三方 viewer 的闭源 bundle，仅本地保存用于解密）
 web-save/

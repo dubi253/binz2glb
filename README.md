@@ -126,7 +126,36 @@ docker cp models/finfet/annotations finfet-viewer:/usr/share/nginx/html/models/f
 
 `docker cp` 的内容随容器删除而消失，只适合调试。
 
-### 3. 多模型（当前限制）
+### 3. CI 构建的镜像（GitHub Actions）
+
+`.github/workflows/image.yml`：push 到 `master`、打 `v*` tag、或手动 `workflow_dispatch` 时，
+在 GitHub 的 runner 上构建 `viewer/Dockerfile` 并推到本仓库的 GHCR 镜像：
+
+```
+ghcr.io/<owner>/<repo>:latest       # master 分支
+ghcr.io/<owner>/<repo>:master
+ghcr.io/<owner>/<repo>:sha-<短哈希>
+ghcr.io/<owner>/<repo>:<版本号>      # 打 v1.2.3 tag 时
+```
+
+workflow 里做了三件事：Buildx 构建（带 gha 层缓存）→ 推到 GHCR（用 `GITHUB_TOKEN`，
+权限 `packages: write`）→ 起容器冒烟测试 `/`、`/app.js`、`/lib/model-viewer.min.js` 是否 200。
+
+拉取：
+
+```bash
+docker pull ghcr.io/<owner>/<repo>:latest
+```
+
+注意两点：
+
+- **GHCR 包默认私有**。要让内网机匿名 `docker pull`，去 GitHub → 仓库右侧 Packages →
+  该包 → Package settings → Change visibility → Public；保持私有则内网机先
+  `echo $TOKEN | docker login ghcr.io -u <user> --password-stdin`。
+- **CI 镜像不含模型**（`models/` 不入库）。两种补齐方式：运行时 `-v /srv/models:...` 挂载，
+  或手动触发 workflow 时填 `model_url`，构建阶段用 `--build-arg MODEL_URL=` 把 glb 下载进镜像。
+
+### 4. 多模型（当前限制）
 
 现在是单模型静态页：`viewer/site/index.html` 的 `src=` 和 `viewer/site/app.js` 里的
 annotations 路径都写死 `models/finfet/`。要多模型库式浏览有两个方向：

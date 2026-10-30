@@ -1,0 +1,2 @@
+# 占位文件：让 COPY models/ 在 CI（models/ 未入库）时也能成立。
+# 真实模型按 models/<slug>/finfet.glb 放，见 README「内网部署」。
