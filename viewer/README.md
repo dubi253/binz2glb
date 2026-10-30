@@ -10,6 +10,15 @@
 `viewer/site/` 只是把 `models/<slug>/annotations/annotations.json` 桥接成 model-viewer 的 hotspot
 （约 100 行 JS），模型、标注、渲染能力都来自上面两个项目。
 
+## 内网部署
+
+完整步骤（docker 代理、镜像 save/load、模型文件导入的三种方式）见仓库根
+`README.md` 的"内网部署（镜像已经在内网机器上）"。要点：
+
+- 镜像只含静态文件，运行时不联网；内网机有 `nginx:alpine` 就能本地重建，否则 `docker save/load` 搬过去
+- 模型按 `models/<slug>/finfet.glb` 放：可打进镜像、也可 `-v /srv/models:/usr/share/nginx/html/models:ro` 挂载
+- `docker pull` 走的是 daemon 代理（`/etc/systemd/system/docker.service.d/http-proxy.conf`），不是 shell 的 `HTTP_PROXY`
+
 ## 起停
 
 ```bash

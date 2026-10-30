@@ -35,6 +35,105 @@ docker compose up -d --build
 #   http://127.0.0.1:8123/        带标注的主视图
 ```
 
+## 内网部署（镜像已经在内网机器上）
+
+镜像 = `nginx:alpine` + 静态文件，运行时不需要网络、不需要 Node/Python、也不需要 `.binz`。
+
+### 0. 只在构建机上：docker 走 HTTPS 代理
+
+`docker pull` 是 daemon 的行为，shell 里的 `HTTP_PROXY` 不生效，要配到 daemon：
+
+```bash
+sudo mkdir -p /etc/systemd/system/docker.service.d
+sudo tee /etc/systemd/system/docker.service.d/http-proxy.conf >/dev/null <<'EOF'
+[Service]
+Environment="HTTP_PROXY=http://127.0.0.1:7890"
+Environment="HTTPS_PROXY=http://127.0.0.1:7890"
+Environment="NO_PROXY=localhost,127.0.0.1,::1,.local"
+EOF
+sudo systemctl daemon-reload && sudo systemctl restart docker
+docker info | grep -i proxy          # 确认生效
+docker pull nginx:alpine
+```
+
+`docker build` 里的下载（npm/apt）走客户端代理配置 `~/.docker/config.json`：
+
+```json
+{ "proxies": { "default": {
+    "httpProxy": "http://127.0.0.1:7890",
+    "httpsProxy": "http://127.0.0.1:7890",
+    "noProxy": "localhost,127.0.0.1"
+} } }
+```
+
+本项目的镜像构建只做 `COPY`，不联网（只要 `nginx:alpine` 已在本地），所以构建阶段其实用不到代理；
+需要代理的是拉基础镜像，以及构建第三方栈（如 Sculpt 的 Node 镜像）。
+
+### 1. 搬运镜像
+
+```bash
+# 构建机
+docker build -f viewer/Dockerfile -t finfet-viewer:1 .
+docker save finfet-viewer:1 | gzip -9 > finfet-viewer-1.tar.gz     # 约 70 MB（模型占大头）
+
+# 内网机
+gunzip -c finfet-viewer-1.tar.gz | docker load
+docker run -d --name finfet-viewer -p 8123:80 finfet-viewer:1
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8123/    # 200
+```
+
+内网机已有 `nginx:alpine` 时也可以只搬代码、在内网 `docker build`——构建全程命中本地层，不联网。
+
+### 2. 导入模型文件（模型不进 git）
+
+模型目录约定（`models/` 已被 `.gitignore` 排除，需自己拷）：
+
+```
+models/<slug>/
+├── finfet.glb                 # 转换产物，唯一运行必需的文件
+├── annotations/annotations.json + images/   # 有标注时
+└── source/                    # 加密 binz 源文件，运行时用不到，不必拷
+```
+
+三种导入方式，按场景选：
+
+**A. 打进镜像（最稳，适合一次部署）** —— 把 `models/` 拷到内网机仓库根，然后内网构建：
+
+```bash
+scp -r models/ intranet-host:/opt/finfet-models/          # 或用内网共享盘
+cd /opt/finfet-models && docker build -f viewer/Dockerfile -t finfet-viewer:1 .
+```
+
+`source/*.binz` 被 `.dockerignore` 排除，不会进镜像（省 38 MB）。
+
+**B. 运行时挂载（推荐，换模型不用重建镜像）** —— 在 `docker-compose.yml` 给服务加一行：
+
+```yaml
+    volumes:
+      - /srv/models:/usr/share/nginx/html/models:ro
+```
+
+宿主机目录保持 `<host>/<slug>/finfet.glb` 结构即可；往里放新模型后刷新页面就生效
+（页面路径仍是 `models/finfet/...`，换 slug 需要同步改页面，见第 3 节）。
+
+**C. 临时验证** —— 不重建、不挂载，直接塞进运行中的容器：
+
+```bash
+docker cp models/finfet/finfet.glb finfet-viewer:/usr/share/nginx/html/models/finfet/finfet.glb
+docker cp models/finfet/annotations finfet-viewer:/usr/share/nginx/html/models/finfet/
+```
+
+`docker cp` 的内容随容器删除而消失，只适合调试。
+
+### 3. 多模型（当前限制）
+
+现在是单模型静态页：`viewer/site/index.html` 的 `src=` 和 `viewer/site/app.js` 里的
+annotations 路径都写死 `models/finfet/`。要多模型库式浏览有两个方向：
+
+- 每模型一个页面 + 一个索引页（纯静态，`models.json` 驱动）；
+- 换成自带模型库的查看器（Sculpt：`publish_to_sculpt.py` 可把模型和带相机的标注直接发布进去）。
+
+
 ## 从 binz 重新生成
 
 前提：把模型页面"另存为 网页，完成"，得到 `xxx.htm` 与 `xxx_files/`（含 viewer 的 `.js`
