@@ -38,6 +38,7 @@ docker compose up -d --build
 ## 内网部署（镜像已经在内网机器上）
 
 镜像 = `nginx:alpine` + 静态文件，运行时不需要网络、不需要 Node/Python、也不需要 `.binz`。
+所需镜像的完整清单（两条部署路径、上游/自建、构建期/运行时）见 [`IMAGES.txt`](IMAGES.txt)。
 
 ### 0. 只在构建机上：docker 走 HTTPS 代理
 

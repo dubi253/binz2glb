@@ -1,0 +1,87 @@
+# 需要的 Docker 镜像清单
+# 生成时间：2026-10-31
+# 说明：本项目有两条部署路径（A 轻量静态查看器 / B Sculpt 全栈），按你要用的那条准备镜像。
+#      "自建"的镜像需要在本机构建；"上游"的镜像 docker pull 即可（本机 daemon 已配 HTTPS 代理）。
+
+
+============================================================
+A. 轻量路径（仓库自带的静态查看器，nginx 单容器）
+============================================================
+
+上游镜像（运行时只需要这一个）：
+  nginx:alpine
+
+自建镜像（由 viewer/Dockerfile 构建）：
+  finfet-viewer:1
+
+构建：
+  cd <仓库根>
+  docker build -f viewer/Dockerfile -t finfet-viewer:1 .
+
+搬运到内网：
+  docker save nginx:alpine finfet-viewer:1 | gzip -9 > finfet-viewer.tar.gz
+  gunzip -c finfet-viewer.tar.gz | docker load
+
+
+============================================================
+B. Sculpt 全栈（多模型库 + 3D 标注，4 个容器）
+============================================================
+
+上游镜像（运行时）：
+  postgres:17-alpine
+  redis:7-alpine
+  caddy:2-alpine          # 仅 --profile tls（HTTPS 反代）时需要，内网可不要
+
+自建镜像（由 Sculpt 仓库的 compose 构建）：
+  sculpt-web:latest       # Next.js 前端
+  sculpt-api:latest       # Express + Prisma 后端
+
+构建期才会用到的基础镜像（内网机不需要）：
+  node:20-alpine          # sculpt-web 构建
+  node:20-slim            # sculpt-api 构建
+
+构建：
+  cd <Sculpt 仓库根>
+  docker compose -f docker-compose.selfhost.yml build
+
+搬运到内网：
+  docker save postgres:17-alpine redis:7-alpine sculpt-web:latest sculpt-api:latest \
+    | gzip -9 > sculpt-stack.tar.gz
+  gunzip -c sculpt-stack.tar.gz | docker load
+
+
+============================================================
+汇总（一行一个，可直接喂给 docker pull / docker save）
+============================================================
+
+# 上游，A 路径
+nginx:alpine
+
+# 上游，B 路径
+postgres:17-alpine
+redis:7-alpine
+caddy:2-alpine
+
+# 仅构建期（构建机才需要）
+node:20-alpine
+node:20-slim
+
+# 本机自建
+finfet-viewer:1
+sculpt-web:latest
+sculpt-api:latest
+
+
+============================================================
+备注
+============================================================
+
+1. docker pull 走的是 daemon 代理，不是 shell 的 HTTP_PROXY：
+   /etc/systemd/system/docker.service.d/http-proxy.conf
+   docker info | grep -i proxy 可确认。
+2. 内网机若已有 nginx:alpine / postgres / redis / node 这些基础镜像，
+   A 路径可以只搬代码本地构建（构建只做 COPY），B 路径也只缺 sculpt-web/sculpt-api 两个自建镜像。
+3. 镜像里不含模型：模型按 models/<slug>/finfet.glb 单独导入，
+   见仓库根 README.md「内网部署 → 2. 导入模型文件」。
+4. 模型转换工具链（decrypt.mjs / osgjs2glb.mjs / validate.mjs）用宿主机 Node 跑，
+   不需要、也不产生任何 node 镜像。
