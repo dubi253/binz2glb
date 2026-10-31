@@ -1,0 +1,42 @@
+name: Download docker Offline Images Suite
+
+on:
+  workflow_dispatch: # 支持在 GitHub Action 页面手动点击按钮触发
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull and Package All Images
+        run: |
+          # 定义 LiteLLM 相关的镜像
+          IMAGES=(
+            "ghcr.io/dubi253/binz2glb:latest"
+          )
+
+          echo "=========================================="
+          echo "1. 开始拉取 LiteLLM 镜像（共 ${#IMAGES[@]} 个）..."
+          echo "=========================================="
+          for img in "${IMAGES[@]}"; do
+            echo "正在下载: $img ..."
+            docker pull "$img"
+          done
+
+          echo "=========================================="
+          echo "2. 正在合并打包并进行 gzip 极限压缩..."
+          echo "=========================================="
+          
+          # 将所有镜像保存到一个 tar.gz 文件中
+          docker save "${IMAGES[@]}" | gzip > "binz2glb-images.tar.gz"
+
+          echo "=========================================="
+          echo "打包成功！离线包最终大小为："
+          du -sh "binz2glb-images.tar.gz"
+          echo "=========================================="
+
+      - name: Upload a Build Artifact
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          path: binz2glb-offline-package.tar.gz
+          archive: false
+          retention-days: 1 # 在 GitHub 上临时保留 1 天供你点击下载
